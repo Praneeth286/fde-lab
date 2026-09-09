@@ -57,3 +57,29 @@ One entry per deliberate failure. Fill it in *while recovering*, not after — t
   the absent Server block in `docker version` told me the daemon was simply down. After
   confirming the WSL backend was healthy, I judged that repairing Docker Desktop wasn't
   worth the time and switched to a native engine — which was closer to production anyway."
+  ### Drill 0c — @Cacheable silently did nothing (unplanned, real)
+- **Date / time to recovery:** 2026-09-09 · ~45 min
+- **Symptom:** No error, no exception, nothing in the logs to suggest a problem.
+  The only signal was `member_lookup_db` appearing twice for two requests with the
+  same memberId, when a working cache would log it once.
+- **First three commands I ran:**
+  1. `docker compose logs claim-api | grep member_lookup_db` — two lines, confirming
+     both requests hit the database
+  2. `redis-cli KEYS 'members*'` — empty, which ruled out TTL and serialization
+     problems: the cache was never populated at all, not populated-then-lost
+  3. checked the logger name in the log line to confirm which class was executing
+- **What I believed vs. what it was:** I first suspected Redis connectivity or a
+  serialization failure. Actual cause was self-invocation: `submit()` called
+  `findMember()` on `this`, so the call never crossed the Spring AOP proxy and the
+  @Cacheable aspect was never consulted. The annotation was present and ignored.
+- **Fix:** Extracted the cached method into its own bean (`MemberLookupService`) so
+  the call crosses a proxy boundary. Verified with the log line count and the
+  `members::M00000042` key appearing in Redis.
+- **Prevention:** Any @Cacheable or @Transactional method needs a test that proves the
+  aspect actually fired — a passing unit test on the method body proves nothing,
+  because the proxy isn't involved. The same trap silently disables @Transactional.
+- **The sentence I'd say in an interview:** "The cache annotation was there and doing
+  nothing. Spring's @Cacheable and @Transactional both work through an AOP proxy, and
+  an internal call from within the same bean bypasses it entirely — so the aspect is
+  silently skipped. The empty Redis keyspace was what told me it had never been
+  populated rather than expired."
