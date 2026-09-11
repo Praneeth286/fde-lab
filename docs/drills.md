@@ -83,3 +83,21 @@ One entry per deliberate failure. Fill it in *while recovering*, not after — t
   an internal call from within the same bean bypasses it entirely — so the aspect is
   silently skipped. The empty Redis keyspace was what told me it had never been
   populated rather than expired."
+  ### Drill 0d — Maven built fine in Docker, failed on the host
+- **Date / time to recovery:** 2026-09-11 · ~15 min
+- **Symptom:** `mvn test` failed with "release version 17 not supported", while the
+  identical build inside Docker had been succeeding for days.
+- **First three commands I ran:**
+  1. `mvn -version` — showed Maven running on a JDK that wasn't 17
+  2. `java -version` — different answer, because Maven reads JAVA_HOME, not PATH
+  3. `ls /usr/lib/jvm/` — only JDK 25 present; 25 dropped --release 17 support
+- **What I believed vs. what it was:** I assumed the Temurin 17 I installed on day 1
+  was available. It was installed on **Windows**; Ubuntu had only the JDK apt pulled
+  in as a Maven dependency. Two filesystems, two toolchains.
+- **Fix:** `apt install openjdk-17-jdk`, then set JAVA_HOME in ~/.bashrc.
+- **Prevention:** The Dockerfile pins `maven:3.9-eclipse-temurin-17`, which is why the
+  container build never broke. Pinned toolchains in the image are the reason
+  "works on my machine" stops being a question.
+- **The sentence I'd say in an interview:** "The containerized build passed and the
+  host build failed on the same source. The image pins its JDK; my host had whatever
+  the package manager chose. That gap is exactly what build containers exist to close."
