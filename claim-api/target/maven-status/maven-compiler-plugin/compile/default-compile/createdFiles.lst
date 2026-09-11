@@ -1,0 +1,17 @@
+com/fdelab/claimapi/repo/MemberRepository.class
+com/fdelab/claimapi/config/CacheConfig.class
+com/fdelab/claimapi/service/MemberLookupService.class
+com/fdelab/claimapi/service/DuplicateClaimException.class
+com/fdelab/claimapi/health/SeedDataHealthIndicator.class
+com/fdelab/claimapi/repo/ClaimRepository.class
+com/fdelab/claimapi/api/dto/MemberView.class
+com/fdelab/claimapi/domain/Member.class
+com/fdelab/claimapi/ClaimApiApplication.class
+com/fdelab/claimapi/domain/Claim.class
+com/fdelab/claimapi/api/dto/ClaimResponse.class
+com/fdelab/claimapi/api/dto/ClaimSummary.class
+com/fdelab/claimapi/service/NotFoundException.class
+com/fdelab/claimapi/api/dto/CreateClaimRequest.class
+com/fdelab/claimapi/service/ClaimService.class
+com/fdelab/claimapi/api/GlobalExceptionHandler.class
+com/fdelab/claimapi/api/ClaimController.class

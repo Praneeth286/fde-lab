@@ -3,12 +3,13 @@ package com.fdelab.claimapi.service;
 import com.fdelab.claimapi.api.dto.CreateClaimRequest;
 import com.fdelab.claimapi.domain.Claim;
 import com.fdelab.claimapi.repo.ClaimRepository;
-import com.fdelab.claimapi.repo.MemberRepository;
+import com.fdelab.claimapi.service.MemberLookupService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import com.fdelab.claimapi.api.dto.MemberView;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -28,7 +29,7 @@ class ClaimServiceTest {
     ClaimRepository claims;
 
     @Mock
-    MemberRepository members;
+    MemberLookupService memberLookup;
 
     @InjectMocks
     ClaimService service;
@@ -66,5 +67,18 @@ class ClaimServiceTest {
 
         assertThat(claim.getStatus()).isEqualTo("SUBMITTED");
         assertThat(claim.getCreatedAt()).isNotNull();
+    }
+    @Test
+    void submits_claim_and_returns_saved_entity() {
+        when(claims.findByClaimNumber("CLM0000000001")).thenReturn(Optional.empty());
+        when(memberLookup.findMember("M00000001"))
+            .thenReturn(new MemberView("M00000001", "Member 1", "PPO", "NJ"));
+        when(claims.save(any(Claim.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        Claim result = service.submit(request());
+
+        assertThat(result.getClaimNumber()).isEqualTo("CLM0000000001");
+        assertThat(result.getStatus()).isEqualTo("SUBMITTED");
+         verify(claims).save(any(Claim.class));
     }
 }
