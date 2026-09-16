@@ -1,0 +1,25 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: claim-api
+spec:
+  replicas: 2 
+  selector:
+    matchLabels:
+      app: claim-api
+  template:
+    metadata:
+      labels:
+        app: claim-api
+    spec:
+      containers:
+        - name: claim-api
+          image: claim-api:0.1.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+          env:
+            - name: DB_HOST
+              value: "172.20.0.1"
+            - name: REDIS_HOST
+              value: "172.20.0.1"

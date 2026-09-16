@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: claim-api
+spec:
+  type: ClusterIP
+  selector:
+    app: claim-api        # note: flat, no matchLabels wrapper
+  ports:
+    - port: 8080          # the port the Service listens on
+      targetPort: 8080    # the port on the pod it forwards to
