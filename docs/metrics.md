@@ -29,3 +29,15 @@ EXPLAIN ANALYZE adds per-node instrumentation overhead, and the first psql run h
 buffer cache (read=78 in the plan) where later runs hit shared buffers. The 176ms first
 request is JVM warm-up — class loading, Hibernate statement prep, first physical pool
 connection, JIT still interpreting. That gap is why startupProbe exists.
+
+## M2 observations (Day 8, Kubernetes) — 2026-09-16
+
+Not before/after metrics, but two numbers that drive probe configuration on Day 10:
+
+| Observation | Value | Why it matters |
+|---|---|---|
+| App startup time in-cluster | 12.5s | A liveness probe firing before this kills a healthy container mid-boot. This is what startupProbe exists to accommodate. |
+| First request to a fresh pod | 140ms (vs ~10ms warm) | Cold JIT, cold Hibernate statement cache, lazy DispatcherServlet init. Each replica pays it independently — which is why latency spikes during a rolling update. |
+
+Row 5 (cold deploy to fresh cluster) stays blank until the Day 14 gate: today's build was
+incremental with explanation between steps, which isn't a valid timing.
