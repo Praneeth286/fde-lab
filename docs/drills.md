@@ -101,3 +101,21 @@ One entry per deliberate failure. Fill it in *while recovering*, not after — t
 - **The sentence I'd say in an interview:** "The containerized build passed and the
   host build failed on the same source. The image pins its JDK; my host had whatever
   the package manager chose. That gap is exactly what build containers exist to close."
+  ### Drill 1 — Kubernetes Secrets are not encrypted
+- **Date:** 2026-09-24
+- **What I checked:** `kubectl get secret claim-api-secret -o yaml`
+- **What I found:** DB_PASSWORD stored as base64 (`Y2hhbmdlbWU=`), decoded with a single
+  `base64 -d`. Worse: the `kubectl.kubernetes.io/last-applied-configuration` annotation
+  contains the original stringData in **plaintext**, because kubectl stores it to compute
+  diffs on the next apply.
+- **Implication:** A Secret is not meaningfully more protected than a ConfigMap by default.
+  The difference is RBAC treatment and how it reaches the node — not cryptography.
+  Encryption at rest in etcd is opt-in and off by default.
+- **Real-world fix:** Sealed Secrets, External Secrets Operator backed by Vault or AWS
+  Secrets Manager, or SOPS-encrypted manifests. Never commit a real credential in a
+  Secret manifest — git history is permanent.
+- **The sentence I'd say in an interview:** "I looked at what was actually stored rather
+  than assuming. The base64 is trivially reversible, and the plaintext is also sitting in
+  the last-applied-configuration annotation. For a PHI environment that's the difference
+  between believing you have secret management and having it."
+  

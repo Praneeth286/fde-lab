@@ -18,8 +18,8 @@ spec:
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8080
-          env:
-            - name: DB_HOST
-              value: "172.20.0.1"
-            - name: REDIS_HOST
-              value: "172.20.0.1"
+          envFrom:
+            - configMapRef:
+                name: claim-api-config
+            - secretRef:
+                name: claim-api-secret
