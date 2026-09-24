@@ -41,3 +41,11 @@ Not before/after metrics, but two numbers that drive probe configuration on Day 
 
 Row 5 (cold deploy to fresh cluster) stays blank until the Day 14 gate: today's build was
 incremental with explanation between steps, which isn't a valid timing.
+## M2 probe and rollback results — 2026-09-24
+
+| # | Metric | Value | Note |
+|---|---|---|---|
+| 6 | Rollback time (`rollout undo` → all pods healthy) | ~35s | The `undo` command itself returns in 0.14s — that is the API call, not the convergence. Real number is from `rollout status` completing: 2 pods replaced, gated by 12.5s app startup plus probe intervals. |
+| — | Readiness detection (DB down → pod 0/1) | ~10s | 2 failures × 5s period |
+| — | Readiness recovery (DB up → pod 1/1) | <10s | within one readiness period |
+| — | Restarts during 10-min DB outage | 0 | liveness correctly excludes dependencies |

@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
         - name: claim-api
-          image: claim-api:0.1.0
+          image: claim-api:0.1.1
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8080
@@ -23,3 +23,21 @@ spec:
                 name: claim-api-config
             - secretRef:
                 name: claim-api-secret
+          startupProbe:
+            httpGet:
+               path: /actuator/health/liveness
+               port: 8080
+            failureThreshold: 30
+            periodSeconds: 2
+          livenessProbe:
+            httpGet:
+               path: /actuator/health/liveness
+               port: 8080
+            failureThreshold: 3
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+               path: /actuator/health/readiness
+               port: 8080
+            failureThreshold: 2
+            periodSeconds: 5      

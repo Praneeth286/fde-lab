@@ -118,4 +118,53 @@ One entry per deliberate failure. Fill it in *while recovering*, not after — t
   than assuming. The base64 is trivially reversible, and the plaintext is also sitting in
   the last-applied-configuration annotation. For a PHI environment that's the difference
   between believing you have secret management and having it."
-  
+  ### Drill 2 — Readiness probe was green and checking nothing
+- **Date / time to diagnose:** 2026-09-24 · ~20 min
+- **Symptom:** Stopped Postgres to test readiness. Pods stayed 1/1 Ready and kept
+  receiving traffic. No error anywhere — the probe reported healthy throughout.
+- **First three commands I ran:**
+  1. `kubectl get pods -w` — READY never changed
+  2. `curl /actuator/health` — showed db, redis, seedData all as components
+  3. `curl /actuator/health/readiness` — bare {"status":"UP"}, no components at all
+- **What I believed vs. what it was:** I assumed configuring a readiness probe against
+  /actuator/health/readiness meant it checked dependencies. Spring Boot's default
+  readiness group contains only `readinessState` — an in-memory flag meaning "Spring
+  finished starting". The db indicator exists on the overall endpoint but is not in the
+  group, so the probe could never detect a dead database.
+- **Fix:** `management.endpoint.health.group.readiness.include: readinessState,db,redis`
+- **Prevention:** Never trust a probe you haven't seen fail. Curl the exact probe path,
+  not the general health endpoint — they return different things.
+- **Interview sentence:** "The probe was green and checking nothing. Spring's default
+  readiness group is just an internal lifecycle flag; the database indicator isn't in it
+  unless you add it. A probe you've never watched fail is decoration."
+
+### Drill 3 — Database outage must not restart pods
+- **Date / recovery:** 2026-09-24 · <10s, within one readiness period
+- **Symptom (deliberate):** stopped Postgres with corrected readiness group in place.
+- **What happened:** Both pods went 0/1 Running within ~10s. Service endpoints emptied
+  immediately — no traffic routed to pods that would 500. RESTARTS stayed at 0 across a
+  10-minute outage. Recovery took less than one readiness period after Postgres returned.
+- **The counterfactual that matters:** had `db` been in the liveness group instead, every
+  pod would have failed liveness simultaneously and been killed and recreated repeatedly
+  for the whole outage — destroying JVM warm-up and in-container logs while fixing nothing.
+  A pod restart cannot repair a database.
+- **Prevention / rule:** liveness = "is this process wedged beyond saving?" (restart is
+  the only fix). Readiness = "should traffic come here right now?" Dependencies belong in
+  readiness, never liveness.
+- **Interview sentence:** "I watched both probes during a deliberate database outage.
+  Readiness pulled the pods from the Service in seconds; liveness correctly ignored it and
+  never restarted anything. That distinction is the difference between a degraded service
+  and a cluster-wide crash loop."
+  ### Drill 4 — rollout undo diverges from declared state
+- **Date:** 2026-09-24
+- **What I found:** `kubectl rollout undo` changed the live Deployment but printed a
+  warning: it does not update the `last-applied-configuration` annotation. My
+  `k8s/deployment.yaml` on disk still specified the newer image. Cluster and repo
+  disagreed.
+- **Why it matters:** the next `kubectl apply -f k8s/` — or the next pipeline run in a
+  GitOps setup — would silently redeploy the version I had just rolled back from.
+- **Also learned:** rolling back does not rewind revision history. Revision 3 disappeared
+  and revision 5 appeared containing the old spec. History is append-only, which is why
+  you can undo an undo.
+- **Rule:** `rollout undo` is an emergency lever to stop the bleeding. The revert must
+  land in git immediately after, or the fix is temporary and nobody knows why it came back.
