@@ -168,3 +168,33 @@ One entry per deliberate failure. Fill it in *while recovering*, not after — t
   you can undo an undo.
 - **Rule:** `rollout undo` is an emergency lever to stop the bleeding. The revert must
   land in git immediately after, or the fix is temporary and nobody knows why it came back.
+  ### Drill 5 — Same DB outage, opposite Kubernetes behaviour
+- **Date:** 2026-10-23 · recovered automatically ~5 min after Postgres returned
+- **Symptom:** Returned to the lab after ~2 weeks. Pods in CrashLoopBackOff with 167 and 177
+  restarts. On Day 10 the identical dependency outage produced 0/1 Running with ZERO restarts.
+- **First three commands:**
+  1. `kubectl get pods` — CrashLoopBackOff, huge restart count
+  2. `kubectl logs --previous` — the dead container's output, not the live one
+  3. read the `Caused by` chain at the bottom of the trace, not the top
+- **Root cause:** "Unable to determine Dialect without JDBC metadata." Hibernate determines
+  the SQL dialect by opening a connection at startup and reading database metadata. With
+  Postgres down, the EntityManagerFactory bean fails afterPropertiesSet, the Spring context
+  never completes, and the process exits. This is a **bean initialization failure**, not a
+  runtime failure.
+- **Why it differs from Day 10:** on Day 10 the app was already running when the database
+  vanished — readiness failed, the Service dropped the pods, liveness correctly ignored it,
+  no restarts. Here the app was starting cold, so the startup probe never passed and kubelet
+  killed the container on repeat.
+- **The lesson:** probes do not decide whether a dependency outage is survivable — the
+  application's startup design does. An app that cannot boot without its database will
+  crash-loop through any outage that outlives a pod restart.
+- **Mitigations:** set `hibernate.dialect` explicitly so no metadata read is needed at boot;
+  lazy datasource initialisation; or accept that cold starts during a DB outage fail and make
+  sure the alert distinguishes the two cases.
+- **Also:** a pod showing `1/1 Running` with 178 restarts is not healthy. Alert on restart
+  rate, not current status.
+- **Interview sentence:** "I saw the same database outage produce two completely different
+  Kubernetes behaviours depending on whether the app was already running. Already-running
+  meant readiness pulled it from the Service with no restarts. Starting cold meant Hibernate
+  couldn't determine its dialect without connecting, the Spring context failed to initialise,
+  and it crash-looped. Probes handle the first case; only application design handles the second."
