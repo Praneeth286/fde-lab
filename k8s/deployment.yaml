@@ -4,6 +4,11 @@ metadata:
   name: claim-api
 spec:
   replicas: 2 
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
   selector:
     matchLabels:
       app: claim-api

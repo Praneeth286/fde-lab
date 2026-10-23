@@ -198,3 +198,23 @@ One entry per deliberate failure. Fill it in *while recovering*, not after — t
   meant readiness pulled it from the Service with no restarts. Starting cold meant Hibernate
   couldn't determine its dialect without connecting, the Spring context failed to initialise,
   and it crash-looped. Probes handle the first case; only application design handles the second."
+  ### Drill 6 — Bad image tag stalls the rollout without touching traffic
+- **Date:** 2026-10-23 · recovery instant
+- **Setup:** strategy set to maxSurge 1, maxUnavailable 0. Deployed a non-existent tag
+  (claim-api:0.9.9-broken) deliberately.
+- **What happened:** one new pod stuck in ErrImagePull. `rollout status` hung and timed out.
+  The two existing pods stayed Running throughout and both IPs remained in the Service
+  endpoints the entire time. Zero requests affected.
+- **Why:** maxUnavailable: 0 means Kubernetes will not remove a healthy pod until the
+  replacement reports ready. The replacement never did, so the rollout simply stopped.
+  With maxUnavailable: 1 it would have torn down a good pod first and run at half capacity;
+  with 2 a single typo in an image tag would have taken the whole service down.
+- **Recovery:** `rollout undo` — instant, because nothing healthy had been removed. Contrast
+  with the Day 10 rollback at ~35s, where two running pods had to be replaced.
+- **Pipeline implication:** `kubectl rollout status --timeout=90s` exits non-zero on a stall.
+  That non-zero exit is what triggers automatic rollback in CI. A deploy step without a
+  timeout hangs forever instead of failing.
+- **Interview sentence:** "I deployed a deliberately broken image tag to watch what
+  maxUnavailable: 0 actually buys you. The rollout stalled, the new pod never pulled, and
+  both existing pods kept serving — the bad deploy never reached traffic. The rollback was
+  instant precisely because nothing healthy had been removed yet."
