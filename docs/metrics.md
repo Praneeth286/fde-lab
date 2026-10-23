@@ -49,3 +49,4 @@ incremental with explanation between steps, which isn't a valid timing.
 | — | Readiness detection (DB down → pod 0/1) | ~10s | 2 failures × 5s period |
 | — | Readiness recovery (DB up → pod 1/1) | <10s | within one readiness period |
 | — | Restarts during 10-min DB outage | 0 | liveness correctly excludes dependencies |
+| 11 | Rollback from a stalled rollout (bad image tag) | M2 | instant — nothing healthy had been removed |

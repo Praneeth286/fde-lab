@@ -50,3 +50,14 @@ history, which is why an undo can itself be undone.
 - No HPA, no resource limits (pending Day 12)
 - No load-test baseline (blocks the p95 alert row)
 - `/actuator/prometheus` exposed but nothing scrapes it
+Your CrashLoopBackOff table in section 2.2 has a row for liveness firing before startup. Add the one you actually hit today:
+
+| Spring context fails at boot, Unable to determine Dialect | Database unreachable at startup — Hibernate reads DB metadata to pick its dialect, so the EntityManagerFactory bean fails and the context never completes | Restore the database. Note this is not the same as a running pod losing its DB — that produces 0/1 with no restarts. Mitigation: set hibernate.dialect explicitly, or lazy datasource init |
+
+And in section 5, “things that look like incidents and are not,” add the inverse — something that looks fine and isn’t:
+
+| Pod shows 1/1 Running | Check RESTARTS. Mine read 168 and 178. A pod that is up right now after crash-looping for two weeks is not healthy. Alert on restart rate, not current status |
+
+The rollback procedure section should also note that recovery time depends on how far the bad deploy got — instant if it stalled at image pull, ~35s if healthy pods had to be replaced.
+
+That last runbook entry is the one I’d prioritize. “Running with 178 restarts” is the kind of thing that passes a dashboard check and fails a service.
