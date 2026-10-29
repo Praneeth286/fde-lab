@@ -50,3 +50,15 @@ incremental with explanation between steps, which isn't a valid timing.
 | — | Readiness recovery (DB up → pod 1/1) | <10s | within one readiness period |
 | — | Restarts during 10-min DB outage | 0 | liveness correctly excludes dependencies |
 | 11 | Rollback from a stalled rollout (bad image tag) | M2 | instant — nothing healthy had been removed |
+## M2 — HPA results (Day 12, 2026-10-29)
+
+| Metric | Value | Note |
+|---|---|---|
+| Idle CPU per pod | 2–5m | vs. 100m request = 5% utilisation |
+| Idle memory, no limit set | ~400Mi | JVM sized heap against node memory |
+| Idle memory, 768Mi limit set | ~265Mi | MaxRAMPercentage=75 now sizes against the container limit, not the node |
+| Peak CPU per pod under load | 189m | Exceeds the 100m request — requests are a scheduling floor, not a ceiling. Only a limit caps CPU, and none was set deliberately |
+| Scale-up | 2 → 6 pods (max) | CPU peaked at 88% against the 50% target |
+| Query latency under load | 2–5ms | The Day 3 index holding up across 6 pods under sustained concurrency, vs 34ms pre-index |
+| Load distribution across 6 pods | 67m–189m, ~3x spread | Single client, single TCP connection — kube-proxy balances connections, not requests |
+| Scale-down delay | [fill in] | Default stabilizationWindowSeconds = 300 |

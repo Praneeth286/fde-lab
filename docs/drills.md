@@ -218,3 +218,25 @@ One entry per deliberate failure. Fill it in *while recovering*, not after — t
   maxUnavailable: 0 actually buys you. The rollout stalled, the new pod never pulled, and
   both existing pods kept serving — the bad deploy never reached traffic. The rollback was
   instant precisely because nothing healthy had been removed yet."
+  ### Drill 7 — HPA: asymmetric scaling, and a container limit that changed the JVM
+- **Date:** 2026-10-29
+- **Setup:** metrics-server (needed --kubelet-insecure-tls on kind — kubelets use self-signed
+  certs, so the default cert validation fails). Resource requests added: cpu 100m, memory
+  512Mi, limit 768Mi. No CPU limit, deliberately. HPA at 50% CPU, min 2, max 6.
+- **Scale-up:** sustained load took CPU to 88% of the 100m request; HPA scaled 2 → 6 (max).
+  Query latency stayed at 2–5ms across six pods, vs 34ms before the Day 3 index.
+- **Scale-down:** CPU fell to 8% at 6m45s. Replicas stayed at 6 until 11m — about 4m15s of
+  deliberate over-provisioning, matching the 300s default stabilizationWindowSeconds. Then
+  6 → 2 in a single step.
+- **Unexpected finding:** idle memory per pod dropped from ~400Mi to ~265Mi after setting a
+  768Mi container limit — no application change. MaxRAMPercentage=75 sizes the heap against
+  the cgroup limit; without one it sized against node memory. This is the benign version of
+  the mechanism that causes OOMKills when the limit is set too low.
+- **Also:** peak per-pod CPU hit 189m against a 100m request. Requests are a scheduling floor
+  and the HPA denominator, not a ceiling — only a limit caps CPU, and none was set.
+- **Also:** load spread unevenly across pods (67m to 189m, ~3x). Single client, single TCP
+  connection; kube-proxy balances connections, not requests. Single-client load tests mislead.
+- **Interview sentence:** "Scaling is asymmetric on purpose — up fast, down after a five
+  minute window, because under-provisioning hurts users now while over-provisioning just costs
+  money briefly. On a JVM service with a 12-second cold start, shortening that window is
+  usually the wrong call."
