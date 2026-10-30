@@ -1,7 +1,7 @@
 # fde-lab — claim-api
 
 A healthcare claims service built as the spine project for a 30-day Forward Deployment Engineer prep plan.
-Java 17 · Spring Boot 3.3 · PostgreSQL · Redis · Docker · (Kubernetes and CI/CD land in weeks 2–3)
+Java 17 · Spring Boot 3.3 · PostgreSQL · Redis · Docker · Kubernetes (kind) · (CI/CD and Kafka still to come)
 
 ## Run it in three commands
 
@@ -12,6 +12,26 @@ curl -s localhost:8080/actuator/health | jq
 ```
 
 First boot takes ~30s while the seed script runs. `docker compose logs -f postgres` shows progress.
+
+## Run it on Kubernetes
+
+Manifests are in `k8s/`: a ConfigMap and Secret for config, a 2-replica Deployment, a ClusterIP Service on 8080, and an HPA. Postgres and Redis still run in Docker Compose.
+
+```bash
+docker compose up -d postgres redis
+docker build -t claim-api:0.1.1 claim-api
+kind load docker-image claim-api:0.1.1
+kubectl apply -f k8s/
+kubectl rollout status deploy/claim-api
+```
+
+What's in the Deployment:
+
+- **Probes:** `startupProbe` and `livenessProbe` on `/actuator/health/liveness`, `readinessProbe` on `/actuator/health/readiness`. Liveness deliberately excludes the database, so a DB outage pulls pods out of the Service without restarting them.
+- **Resources:** requests of 100m CPU / 512Mi memory, a 768Mi memory limit, and no CPU limit (on purpose).
+- **Autoscaling:** HPA from 2 to 6 replicas at 50% average CPU.
+
+`DB_HOST` in the ConfigMap points at the kind network gateway, which is a lab shortcut. See `docs/runbook.md` for known gaps.
 
 ## Endpoints
 
@@ -34,6 +54,17 @@ curl -s -X POST localhost:8080/claims -H 'Content-Type: application/json' -d '{
 curl -s -X POST localhost:8080/claims -H 'Content-Type: application/json' -d '{
   "claimNumber":"nope","memberId":"","providerNpi":"12","serviceDate":"2999-01-01","amount":-5}' | jq
 ```
+
+## Lab notes
+
+The point of this repo is the operational record, not just the code:
+
+| File | What's in it |
+|---|---|
+| [`docs/metrics.md`](docs/metrics.md) | Real before/after numbers: image size (1.07GB → 373MB), query latency, cache hit rates, rollback time, HPA behaviour |
+| [`docs/drills.md`](docs/drills.md) | A log of deliberate (and some accidental) failures, each with symptom, diagnosis and fix |
+| [`docs/runbook.md`](docs/runbook.md) | Hand-off runbook: alerts, rollback procedure, known failure modes and gaps |
+| [`START-HERE-LAB.md`](START-HERE-LAB.md) | Step-by-step guide for the first two lab sessions |
 
 ## Architecture (end state, day 26)
 
